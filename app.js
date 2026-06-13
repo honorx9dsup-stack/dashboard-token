@@ -4,17 +4,15 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-
 const PORT = process.env.PORT || 3000;
 
-const CLIENT_ID = process.env.CLIENT_ID || '1515293075889586286';
-const CLIENT_SECRET = process.env.CLIENT_SECRET; 
-const REDIRECT_URI = process.env.REDIRECT_URI || `https://dashboard-token.onrender.com/callback`;
+// 🔥 المتغيرات حطها هنا مباشرة (ما تحتاج Environment Variables)
+const CLIENT_ID = '1515293075889586286';
+const CLIENT_SECRET = '0rk6vvtVp26Asgn9yw-98I2uWdN7BPJ5';  // حط السر الصحيح هنا
+const REDIRECT_URI = 'https://dashboard-token.onrender.com/callback';
+const ADMIN_PASSWORD = 'MySecretPass123';
 
-// استخدام المجلد اللي يشتغل عليه Render (بدون صلاحيات)
 const TOKENS_FILE = path.join(__dirname, 'stock.txt');
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'MySecretPass123';
 
 app.get('/', (req, res) => {
     const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify`;
@@ -46,7 +44,6 @@ app.get('/callback', async (req, res) => {
 
         const accessToken = response.data.access_token;
 
-        // حفظ التوكن في الملف
         fs.appendFile(TOKENS_FILE, accessToken + '\n', (err) => {
             if (err) console.log('خطأ في حفظ الملف:', err);
         });
@@ -55,14 +52,14 @@ app.get('/callback', async (req, res) => {
             <div style="text-align: center; font-family: sans-serif; margin-top: 100px;">
                 <h2 style="color: #43b581;">🎉 تمت العملية بنجاح!</h2>
                 <p>تم استلام التوكن وحفظه.</p>
+                <br>
+                <a href="/admin-dashboard?password=${ADMIN_PASSWORD}" style="color: #5865F2;">عرض التوكنات</a>
             </div>
         `);
     } catch (error) {
         res.send('حدث خطأ أثناء معالجة الطلب.');
     }
 });
-
-// ========== الداشبورد ==========
 
 app.get('/admin-dashboard', (req, res) => {
     const password = req.query.password;
@@ -104,27 +101,6 @@ app.get('/admin-dashboard', (req, res) => {
     });
 });
 
-app.get('/add-token', (req, res) => {
-    const token = req.query.token;
-    const password = req.query.password;
-
-    if (password !== ADMIN_PASSWORD) {
-        return res.status(403).send('Unauthorized');
-    }
-
-    if (!token) {
-        return res.status(400).send('Token is required');
-    }
-
-    fs.appendFile(TOKENS_FILE, token + '\n', (err) => {
-        if (err) {
-            return res.status(500).send('Error saving token');
-        }
-        res.send('✅ Token saved successfully!');
-    });
-});
-
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ السيرفر شغال على بورت: ${PORT}`);
-    console.log(`📁 التوكنات تحفظ في: ${TOKENS_FILE}`);
 });
