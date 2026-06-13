@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 3000;
 
 // متغيرات التطبيق
 const CLIENT_ID = '1515293075889586286';
-const CLIENT_SECRET = 'Ork6vvtVp26Asgn9yw9812uWdN7BPJ5';
+const CLIENT_SECRET = 'FYOLy7auE9c9qPoblvVmnepZMFHR1pjL';
 const REDIRECT_URI = 'https://dashboard-token.onrender.com/callback';
 const ADMIN_PASSWORD = 'MySecretPass123';
 
