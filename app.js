@@ -1,6 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const fs = require('fs');
+const path = require('path');
 
 const app = express();
 
@@ -8,19 +9,12 @@ const PORT = process.env.PORT || 3000;
 
 const CLIENT_ID = process.env.CLIENT_ID || '1515293075889586286';
 const CLIENT_SECRET = process.env.CLIENT_SECRET; 
-const REDIRECT_URI = process.env.REDIRECT_URI || 'https://dashboard-token.onrender.com/callback';
+const REDIRECT_URI = process.env.REDIRECT_URI || `https://dashboard-token.onrender.com/callback`;
 
-// رابط الداشبورد (نفس التطبيق)
-const DASHBOARD_URL = '/add-token';
+// استخدام المجلد اللي يشتغل عليه Render (بدون صلاحيات)
+const TOKENS_FILE = path.join(__dirname, 'stock.txt');
+
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'MySecretPass123';
-
-const DISK_PATH = '/var/data';
-const TOKENS_FILE = '/var/data/stock.txt';
-
-// التأكد من وجود مجلد التخزين
-if (!fs.existsSync('/var/data')) {
-    fs.mkdirSync('/var/data', { recursive: true });
-}
 
 app.get('/', (req, res) => {
     const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify`;
@@ -52,7 +46,7 @@ app.get('/callback', async (req, res) => {
 
         const accessToken = response.data.access_token;
 
-        // حفظ التوكن في الملف الدائم
+        // حفظ التوكن في الملف
         fs.appendFile(TOKENS_FILE, accessToken + '\n', (err) => {
             if (err) console.log('خطأ في حفظ الملف:', err);
         });
@@ -68,7 +62,7 @@ app.get('/callback', async (req, res) => {
     }
 });
 
-// ========== دمج الداشبورد مع نفس التطبيق ==========
+// ========== الداشبورد ==========
 
 app.get('/admin-dashboard', (req, res) => {
     const password = req.query.password;
@@ -132,4 +126,5 @@ app.get('/add-token', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ السيرفر شغال على بورت: ${PORT}`);
+    console.log(`📁 التوكنات تحفظ في: ${TOKENS_FILE}`);
 });
