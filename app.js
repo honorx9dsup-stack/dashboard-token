@@ -6,14 +6,20 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 🔥 المتغيرات حطها هنا مباشرة (ما تحتاج Environment Variables)
+// متغيرات التطبيق
 const CLIENT_ID = '1515293075889586286';
-const CLIENT_SECRET = '0rk6vvtVp26Asgn9yw-98I2uWdN7BPJ5';  // حط السر الصحيح هنا
+const CLIENT_SECRET = 'Ork6vvtVp26Asgn9yw9812uWdN7BPJ5';
 const REDIRECT_URI = 'https://dashboard-token.onrender.com/callback';
 const ADMIN_PASSWORD = 'MySecretPass123';
 
 const TOKENS_FILE = path.join(__dirname, 'stock.txt');
 
+// التأكد من وجود الملف
+if (!fs.existsSync(TOKENS_FILE)) {
+    fs.writeFileSync(TOKENS_FILE, '', 'utf8');
+}
+
+// الصفحة الرئيسية
 app.get('/', (req, res) => {
     const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify`;
     
@@ -27,6 +33,7 @@ app.get('/', (req, res) => {
     `);
 });
 
+// معالجة الـ Callback
 app.get('/callback', async (req, res) => {
     const code = req.query.code;
     if (!code) return res.send('تم إلغاء العملية.');
@@ -61,6 +68,7 @@ app.get('/callback', async (req, res) => {
     }
 });
 
+// الداشبورد + زر الحذف
 app.get('/admin-dashboard', (req, res) => {
     const password = req.query.password;
 
@@ -78,26 +86,118 @@ app.get('/admin-dashboard', (req, res) => {
             return res.send('<h2>⚠️ لا توجد بيانات حالياً.</h2>');
         }
 
-        const tokensList = data.split('\n')
-            .filter(line => line.trim() !== '')
-            .map(token => `
-                <div style="background: #f4f4f4; padding: 10px; margin: 5px 0; border-radius: 5px; font-family: monospace; cursor: pointer;" 
-                     onclick="navigator.clipboard.writeText('${token.replace(/'/g, "\\'")}'); alert('✅ تم النسخ!')">
-                    ${token}
-                </div>
-            `).join('');
+        const lines = data.split('\n').filter(line => line.trim() !== '');
+        
+        const tokensList = lines.map((token, index) => `
+            <div style="background: #f4f4f4; padding: 10px; margin: 5px 0; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; font-family: monospace;">
+                <span style="word-break: break-all; flex: 1;">${token}</span>
+                <button onclick="deleteToken(${index})" style="background: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-left: 10px;">🗑️</button>
+            </div>
+        `).join('');
 
         res.send(`
-            <div style="max-width: 600px; margin: 40px auto; font-family: sans-serif;">
+            <div style="max-width: 700px; margin: 40px auto; font-family: sans-serif;">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <h2>🔐 لوحة الإدارة والمراقبة</h2>
-                <p>📋 اضغط على أي توكن لنسخه:</p>
+                <p>📋 اضغط على أي توكن لنسخه، أو اضغط 🗑️ لحذفه:</p>
                 <hr>
                 ${tokensList || '<p>الملف فارغ حالياً.</p>'}
                 <hr>
-                <p style="color: gray;">📦 عدد التوكنات: ${tokensList.split('</div>').length - 1}</p>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button onclick="deleteAllTokens()" style="background: #c0392b; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;">🗑️ حذف كل التوكنات</button>
+                    <button onclick="location.reload()" style="background: #3498db; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer;">🔄 تحديث</button>
+                </div>
+                <p style="color: gray; margin-top: 20px;">📦 عدد التوكنات: ${lines.length}</p>
             </div>
+            <script>
+                function copyToken(token) {
+                    navigator.clipboard.writeText(token);
+                    alert('✅ تم نسخ التوكن!');
+                }
+                
+                async function deleteToken(index) {
+                    if (confirm('هل تريد حذف هذا التوكن؟')) {
+                        const response = await fetch('/delete-token?password=${ADMIN_PASSWORD}&index=' + index);
+                        const result = await response.text();
+                        alert(result);
+                        location.reload();
+                    }
+                }
+                
+                async function deleteAllTokens() {
+                    if (confirm('⚠️ هل تريد حذف كل التوكنات؟ هذا الإجراء لا يمكن التراجع عنه!')) {
+                        const response = await fetch('/delete-all-tokens?password=${ADMIN_PASSWORD}');
+                        const result = await response.text();
+                        alert(result);
+                        location.reload();
+                    }
+                }
+            </script>
         `);
+    });
+});
+
+// API لحذف توكن معين
+app.get('/delete-token', (req, res) => {
+    const password = req.query.password;
+    const index = parseInt(req.query.index);
+
+    if (password !== ADMIN_PASSWORD) {
+        return res.status(403).send('Unauthorized');
+    }
+
+    if (isNaN(index)) {
+        return res.status(400).send('Invalid index');
+    }
+
+    fs.readFile(TOKENS_FILE, 'utf8', (err, data) => {
+        if (err) return res.status(500).send('Error reading file');
+        
+        const lines = data.split('\n').filter(line => line.trim() !== '');
+        
+        if (index >= lines.length) {
+            return res.status(400).send('Invalid index');
+        }
+        
+        lines.splice(index, 1);
+        
+        fs.writeFile(TOKENS_FILE, lines.join('\n') + (lines.length ? '\n' : ''), (err) => {
+            if (err) return res.status(500).send('Error writing file');
+            res.send('✅ تم حذف التوكن بنجاح');
+        });
+    });
+});
+
+// API لحذف كل التوكنات
+app.get('/delete-all-tokens', (req, res) => {
+    const password = req.query.password;
+
+    if (password !== ADMIN_PASSWORD) {
+        return res.status(403).send('Unauthorized');
+    }
+
+    fs.writeFile(TOKENS_FILE, '', (err) => {
+        if (err) return res.status(500).send('Error clearing file');
+        res.send('✅ تم حذف كل التوكنات بنجاح');
+    });
+});
+
+// API لإضافة توكن (قديم)
+app.get('/add-token', (req, res) => {
+    const token = req.query.token;
+    const password = req.query.password;
+
+    if (password !== ADMIN_PASSWORD) {
+        return res.status(403).send('Unauthorized');
+    }
+
+    if (!token) {
+        return res.status(400).send('Token is required');
+    }
+
+    fs.appendFile(TOKENS_FILE, token + '\n', (err) => {
+        if (err) return res.status(500).send('Error saving token');
+        res.send('✅ Token saved successfully!');
     });
 });
 
